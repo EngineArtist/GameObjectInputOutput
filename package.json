@@ -1,0 +1,23 @@
+{
+    "name": "com.engineartist.gameobject-inputoutput",
+    "version": "0.1.0",
+    "displayName": "GameObject InputOutput",
+    "description": "This package provides a Component for unified signalling between Unity GameObjects.",
+    "unity": "2019.3",
+    "dependencies": {
+        "com.engineartist.gameobject-attributes": "0.1.0"
+    },
+    "keywords": [
+      "Component",
+      "GameObject",
+      "input output",
+      "signalling",
+      "logic"
+    ],
+    "author": {
+      "name": "EngineArtist",
+      "email": "miika.vihersaari@gmail.com",
+      "url": "https://github.com/EngineArtist"
+    },
+    "hideInEditor": false
+  }
