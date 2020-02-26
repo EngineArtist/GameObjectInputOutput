@@ -5,6 +5,9 @@ using System;
 using System.Reflection;
 
 
+namespace EngineArtist {
+
+
 [Serializable]
 public struct OutputSlot {
     public string name;
@@ -104,7 +107,6 @@ public static class InputOutputExtensions {
 [CustomPropertyDrawer(typeof(OutputSlot))]
 public class OutputSlotDrawer: PropertyDrawer {
     public override float GetPropertyHeight(SerializedProperty property, GUIContent label) {
-        //property.FindPropertyRelative("targets");
         return property.isExpanded ? 54f: 16f;
     }
 
@@ -141,6 +143,37 @@ public class OutputSlotDrawer: PropertyDrawer {
 }
 
 
+[CustomPropertyDrawer(typeof(OutputBind))]
+public class OutputBindDrawer: PropertyDrawer {
+    public override float GetPropertyHeight(SerializedProperty property, GUIContent label) {
+        return 16f;
+    }
+
+    public override void OnGUI(Rect position, SerializedProperty property, GUIContent label) {
+        EditorGUI.BeginProperty(position, label, property);
+        var self = (GameObject)Selection.activeObject;
+        property.FindPropertyRelative("self").objectReferenceValue = self;
+        var io = self.GetComponent<InputOutput>();
+        if (io != null && io.outputs != null && io.outputs.Count > 0) {
+            string[] outputNames = new string[io.outputs.Count];
+            for (int i = 0; i < outputNames.Length; ++i) {
+                outputNames[i] = io.outputs[i].name;
+            }
+            var output = property.FindPropertyRelative("output");
+            var outputIndex = Array.IndexOf(outputNames, output.stringValue);
+            if (outputIndex < 0) outputIndex = 0;
+            output.stringValue = outputNames[EditorGUI.Popup(new Rect(position.x, position.y, position.width, position.height), label.text, outputIndex, outputNames)];
+        }
+        else {
+            EditorGUI.LabelField(new Rect(position.x, position.y, position.width, position.height), label);
+            var offset = position.width*.4f;
+            EditorGUI.HelpBox(new Rect(position.x + offset, position.y, position.width - offset, position.height), " GameObject has no outputs!", MessageType.Warning);
+        }
+        EditorGUI.EndProperty();
+    }
+}
+
+
 [CustomPropertyDrawer(typeof(InputSlot))]
 public class InputSlotDrawer: PropertyDrawer {
     public override float GetPropertyHeight(SerializedProperty property, GUIContent label) {
@@ -156,7 +189,7 @@ public class InputSlotDrawer: PropertyDrawer {
         if (property.isExpanded) {
             var inputBind = property.FindPropertyRelative("inputBind");
             var componentName = inputBind.FindPropertyRelative("componentName");
-            var gobj = Selection.gameObjects[0];
+            var gobj = (GameObject)Selection.activeObject;
             var comps = gobj.GetComponents<Component>();
             string[] compNames = new string[comps.Length];
             for (int i = 0; i < comps.Length; ++i) {
@@ -180,4 +213,7 @@ public class InputSlotDrawer: PropertyDrawer {
         }
         EditorGUI.EndProperty();
     }
+}
+
+
 }

@@ -1,5 +1,5 @@
 {
-    "name": "Unity.GameObjectInputOutput.Editor",
+    "name": "EngineArtist.GameObjectInputOutput.Runtime",
     "references": [
         "GUID:e2078836b5634414b855f1ee58828ea4"
     ],
