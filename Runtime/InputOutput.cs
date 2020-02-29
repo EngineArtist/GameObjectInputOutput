@@ -11,16 +11,30 @@ namespace EngineArtist {
 [Serializable]
 public struct OutputSlot {
     public string name;
+    public OutputTarget[] targets;
+}
+
+
+[Serializable]
+public struct OutputTarget {
     public GameObject target;
     public string input;
     [SerializeReference] public IAttribute[] args;
 }
 
 
+public interface Command {
+    void Execute();
+}
+
+
 [Serializable]
-public struct OutputBind {
+public class OutputTrigger: Command {
     public GameObject self;
     public string output;
+
+
+    public void Execute() => self.SendSignal(output);
 }
 
 
@@ -79,11 +93,15 @@ public static class InputOutputExtensions {
         var sign = gobj.GetComponent<InputOutput>();
         if (sign != null) {
             for (int i = 0; i < sign.outputs.Count; ++i) {
-                if (sign.outputs[i].name == name && sign.outputs[i].target != null) {
-                    sign.outputs[i].target.ReceiveSignal(
-                        sign.outputs[i].input,
-                        sign.outputs[i].args
-                    );
+                if (sign.outputs[i].name == name && sign.outputs[i].targets != null) {
+                    for (int j = 0; j < sign.outputs[i].targets.Length; ++j) {
+                        if (sign.outputs[i].targets[j].target != null) {
+                            sign.outputs[i].targets[j].target.ReceiveSignal(
+                                sign.outputs[i].targets[j].input,
+                                sign.outputs[i].targets[j].args
+                            );
+                        }
+                    }
                     return;
                 }
             }
@@ -107,7 +125,16 @@ public static class InputOutputExtensions {
 [CustomPropertyDrawer(typeof(OutputSlot))]
 public class OutputSlotDrawer: PropertyDrawer {
     public override float GetPropertyHeight(SerializedProperty property, GUIContent label) {
-        return property.isExpanded ? 54f: 16f;
+        if (property.isExpanded) {
+            var height = 40f;
+            var targets = property.FindPropertyRelative("targets");
+            var targetsCount = targets.arraySize;
+            for (int i = 0; i < targetsCount; ++i) {
+                height += EditorGUI.GetPropertyHeight(targets.GetArrayElementAtIndex(i)) + 12f;
+            }
+            return height;
+        }
+        return 16f;
     }
 
     public override void OnGUI(Rect position, SerializedProperty property, GUIContent label) {
@@ -117,25 +144,26 @@ public class OutputSlotDrawer: PropertyDrawer {
         if (foldoutLabel == null || foldoutLabel == "") foldoutLabel = "Unnamed output";
         property.isExpanded = EditorGUI.Foldout(new Rect(position.x, position.y, property.isExpanded ? 19f: position.width, 16f), property.isExpanded, property.isExpanded ? "": foldoutLabel, true, EditorStyles.foldout);
         if (property.isExpanded) {
-            var target = property.FindPropertyRelative("target");
-            var input = property.FindPropertyRelative("input");
+            var height = 24f;
             name.stringValue = EditorGUI.TextField(new Rect(position.x, position.y, position.width, 16f), name.stringValue);
-            EditorGUI.PropertyField(new Rect(position.x, position.y + 16f, position.width, 16f), target);
-            var targetGobj = (GameObject)target.objectReferenceValue;
-            if (targetGobj != null) {
-                var sign = targetGobj.GetComponent<InputOutput>();
-                if (sign != null && sign.inputs != null && sign.inputs.Count > 0) {
-                    string[] inputNames = new string[sign.inputs.Count];
-                    for (int i = 0; i < inputNames.Length; ++i) {
-                        inputNames[i] = sign.inputs[i].name;
-                    }
-                    int sel = Array.FindIndex(inputNames, (string s) => s == input.stringValue);
-                    if (sel < 0) sel = 0;
-                    input.stringValue = inputNames[EditorGUI.Popup(new Rect(position.x, position.y + 32f, position.width, 16f), "Target input", sel, inputNames)];
+            var targets = property.FindPropertyRelative("targets");
+            var targetsCount = targets.arraySize;
+            var removeIndex = -1;
+            for (int i = 0; i < targetsCount; ++i) {
+                var target = targets.GetArrayElementAtIndex(i);
+                EditorGUI.PropertyField(new Rect(position.x + 4f, position.y + height, position.width - 72f, 16f), target);
+                if (GUI.Button(new Rect(position.x + position.width - 68f, position.y + height, 64f, 16f), "Remove")) {
+                    removeIndex = i;
                 }
-                else {
-                    input.stringValue = "";
-                }
+                var targetHeight = EditorGUI.GetPropertyHeight(target);
+                EditorGUI.HelpBox(new Rect(position.x + 16f, position.y + height - 4f, position.width - 16f, targetHeight + 8f), "", MessageType.None);
+                height += targetHeight + 12f;
+            }
+            if (removeIndex >= 0) {
+                targets.DeleteArrayElementAtIndex(removeIndex);
+            }
+            else if (GUI.Button(new Rect(position.x + 16f, position.y + height - 4f, 80f, 16f), "Add target")) {
+                targets.InsertArrayElementAtIndex(targetsCount);
             }
         }
         EditorGUI.EndProperty();
@@ -143,8 +171,48 @@ public class OutputSlotDrawer: PropertyDrawer {
 }
 
 
-[CustomPropertyDrawer(typeof(OutputBind))]
-public class OutputBindDrawer: PropertyDrawer {
+[CustomPropertyDrawer(typeof(OutputTarget))]
+public class OutputTargetDrawer: PropertyDrawer {
+    public override float GetPropertyHeight(SerializedProperty property, GUIContent label) {
+        var target = property.FindPropertyRelative("target");
+        var targetGobj = (GameObject)target.objectReferenceValue;
+        if (targetGobj != null) {
+            var sign = targetGobj.GetComponent<InputOutput>();
+            if (sign != null && sign.inputs != null && sign.inputs.Count > 0) {
+                return 34f;
+            }
+        }
+        return 16f;
+    }
+
+    public override void OnGUI(Rect position, SerializedProperty property, GUIContent label) {
+        EditorGUI.BeginProperty(position, label, property);
+        var target = property.FindPropertyRelative("target");
+        var input = property.FindPropertyRelative("input");
+        EditorGUI.PropertyField(new Rect(position.x, position.y, position.width, 16f), target);
+        var targetGobj = (GameObject)target.objectReferenceValue;
+        if (targetGobj != null) {
+            var sign = targetGobj.GetComponent<InputOutput>();
+            if (sign != null && sign.inputs != null && sign.inputs.Count > 0) {
+                string[] inputNames = new string[sign.inputs.Count];
+                for (int i = 0; i < inputNames.Length; ++i) {
+                    inputNames[i] = sign.inputs[i].name;
+                }
+                int sel = Array.FindIndex(inputNames, (string s) => s == input.stringValue);
+                if (sel < 0) sel = 0;
+                input.stringValue = inputNames[EditorGUI.Popup(new Rect(position.x, position.y + 18f, position.width, 16f), "Target input", sel, inputNames)];
+            }
+            else {
+                input.stringValue = "";
+            }
+        }
+        EditorGUI.EndProperty();
+    }
+}
+
+
+[CustomPropertyDrawer(typeof(OutputTrigger))]
+public class OutputTriggerDrawer: PropertyDrawer {
     public override float GetPropertyHeight(SerializedProperty property, GUIContent label) {
         return 16f;
     }
