@@ -8,10 +8,36 @@ using System.Reflection;
 namespace EngineArtist {
 
 
+public static class InputOutputUtils {
+    public static bool callbackRegistered = false;
+
+
+    public static void UpdateCallback(SceneView view) {
+        var gobj = Selection.activeGameObject;
+        if (gobj != null) {
+            var io = gobj.GetComponent<InputOutput>();
+            if (io != null && io.outputs != null) {
+                var from = gobj.transform.localPosition;
+                Handles.color = Color.red;
+                for (int i = 0; i < io.outputs.Count; ++i) {
+                    if (io.outputs[i].targets != null) {
+                        for (int j = 0; j < io.outputs[i].targets.Count; ++j) {
+                            if (io.outputs[i].targets[j].target != null) {
+                                Handles.DrawLine(from, io.outputs[i].targets[j].target.transform.localPosition);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+
 [Serializable]
 public struct OutputSlot {
     public string name;
-    public OutputTarget[] targets;
+    public List<OutputTarget> targets;
 }
 
 
@@ -94,7 +120,7 @@ public static class InputOutputExtensions {
         if (sign != null) {
             for (int i = 0; i < sign.outputs.Count; ++i) {
                 if (sign.outputs[i].name == name && sign.outputs[i].targets != null) {
-                    for (int j = 0; j < sign.outputs[i].targets.Length; ++j) {
+                    for (int j = 0; j < sign.outputs[i].targets.Count; ++j) {
                         if (sign.outputs[i].targets[j].target != null) {
                             sign.outputs[i].targets[j].target.ReceiveSignal(
                                 sign.outputs[i].targets[j].input,
@@ -186,6 +212,11 @@ public class OutputTargetDrawer: PropertyDrawer {
     }
 
     public override void OnGUI(Rect position, SerializedProperty property, GUIContent label) {
+        if (!InputOutputUtils.callbackRegistered) {
+            InputOutputUtils.callbackRegistered = true;
+            SceneView.duringSceneGui -= InputOutputUtils.UpdateCallback;
+            SceneView.duringSceneGui += InputOutputUtils.UpdateCallback;
+        }
         EditorGUI.BeginProperty(position, label, property);
         var target = property.FindPropertyRelative("target");
         var input = property.FindPropertyRelative("input");
